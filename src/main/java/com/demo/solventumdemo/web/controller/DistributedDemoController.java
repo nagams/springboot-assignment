@@ -1,5 +1,6 @@
 package com.demo.solventumdemo.web.controller;
 
+import com.demo.solventumdemo.service.RedissonService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -9,19 +10,20 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.concurrent.Semaphore;
 
 /**
- * This is the correct controller for the assignment.
- * Controller makes use of Semaphore to manage the number of permits available to access endpoint available in this controller.
- * Currently, it is set to 2 so that at any given point at max only two endpoints would respond and the other would return error
- * response.
+ * This controller makes use of distributed Semaphore available with Redis via Redisson client implementation
+ * This will ensure that only set number of requests will succeed when it receives the requests concurrently.
  *
  * @author Nagaraja Settra
  */
 @RestController
-@RequestMapping("/api")
-public class OnemoreDemoController {
-    private static final int MAX_AVAILABLE = 2;
+@RequestMapping("/api/v2")
+public class DistributedDemoController {
 
-    private final Semaphore availableEndPoints = new Semaphore(MAX_AVAILABLE);
+    private final RedissonService redissonService;
+
+    public DistributedDemoController(RedissonService redissonService) {
+        this.redissonService = redissonService;
+    }
 
     @GetMapping("/one")
     public ResponseEntity<String> getOne() {
@@ -39,14 +41,14 @@ public class OnemoreDemoController {
     }
 
     private ResponseEntity<String> processRequest(String message) {
-        if (availableEndPoints.tryAcquire()) {
+        if (redissonService.getRedissonSemaphore().tryAcquire()) {
             try {
                 return ResponseEntity.ok(message);
             } catch (Exception e) {
                 return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                         .body("Error occurred while processing");
             } finally {
-                availableEndPoints.release();
+                redissonService.getRedissonSemaphore().release();
             }
         } else {
             // concurrent requests

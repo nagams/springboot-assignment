@@ -115,9 +115,7 @@ class OnemoreDemoControllerTest {
                 .map(f -> {
                     try {
                         return f.get().getResponse().getStatus();
-                    } catch (InterruptedException e) {
-                        throw new RuntimeException(e);
-                    } catch (ExecutionException e) {
+                    } catch (InterruptedException | ExecutionException e) {
                         throw new RuntimeException(e);
                     }
                 })

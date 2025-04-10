@@ -1,12 +1,16 @@
 package com.demo.solventumdemo.web.controller;
 
 import com.demo.solventumdemo.config.DemoConfigProperties;
+import com.demo.solventumdemo.config.SecurityConfig;
 import com.demo.solventumdemo.service.RedissonService;
+import com.demo.solventumdemo.service.TokenService;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpStatus;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -16,24 +20,46 @@ import java.util.List;
 import java.util.concurrent.*;
 
 import static org.assertj.core.api.AssertionsForInterfaceTypes.assertThat;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.httpBasic;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 
 import static org.junit.jupiter.api.Assertions.*;
 
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-//@WebMvcTest(DistributedDemoController.class)
-@AutoConfigureMockMvc(addFilters = false)
+@WebMvcTest({DistributedDemoController.class, AuthController.class})
+@Import({SecurityConfig.class, TokenService.class, RedissonService.class})
 class DistributedDemoControllerTest {
 
     @Autowired
     MockMvc mockMvc;
 
     @Test
-    void getFour() throws Exception {
-        mockMvc.perform(get("/api/v2/four"))
+    void whenNotAuthenticated_then401() throws Exception {
+        this.mockMvc.perform(get("/api/v2/four"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    String token;
+
+    @BeforeEach
+    void setUp() throws Exception {
+        MvcResult result = mockMvc.perform(post("/token")
+                        .with(httpBasic("demo", "password")))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        token = result.getResponse().getContentAsString();
+
+    }
+
+    @Test
+    void whenAuthenticated_getFour() throws Exception {
+
+        mockMvc.perform(get("/api/v2/four")
+                        .header("Authorization", "Bearer " + token))
                 .andExpectAll(
                         status().isOk(),
                         content().string("this is Four!")
@@ -57,7 +83,9 @@ class DistributedDemoControllerTest {
         for (int i = 0; i < threadCount; i++) {
             Callable<MvcResult> task = () -> {
                 int randomApiIndex = ThreadLocalRandom.current().nextInt(apis.length);
-                return mockMvc.perform(get(apis[randomApiIndex])).andReturn();
+                return mockMvc.perform(get(apis[randomApiIndex])
+                                .header("Authorization", "Bearer " + token))
+                        .andReturn();
             };
             tasks.add(task);
         }

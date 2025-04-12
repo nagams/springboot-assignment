@@ -83,8 +83,7 @@ class DistributedDemoControllerTest {
         for (int i = 0; i < threadCount; i++) {
             Callable<MvcResult> task = () -> {
                 int randomApiIndex = ThreadLocalRandom.current().nextInt(apis.length);
-                return mockMvc.perform(get(apis[randomApiIndex])
-                                .header("Authorization", "Bearer " + token))
+                return mockMvc.perform(get(apis[randomApiIndex]))
                         .andReturn();
             };
             tasks.add(task);

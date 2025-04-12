@@ -54,8 +54,4 @@ public class OnemoreDemoController {
         }
     }
 
-    @GetMapping("/four")
-    public String getFour() {
-        return "this is Four!";
-    }
 }
